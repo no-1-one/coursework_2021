@@ -1,0 +1,89 @@
+
+
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "ru.wip.services.sgp";
+option java_outer_classname = "SGPProto";
+option objc_class_prefix = "SGP";
+
+package SGP;
+
+// Interface exported by the server.
+service SGPService {
+
+  rpc SGPConstruct(SGPConstructRequest) returns (SGPConstructResponse) {}
+
+
+  rpc SGPCompute(SGPComputeRequest) returns (SGPComputeResponse) {}
+
+  // A client-to-server streaming RPC.
+  //
+  // Accepts a stream of Points on a route being traversed, returning a
+  // RouteSummary when traversal is completed.
+  //rpc RecordRoute(stream Point) returns (RouteSummary) {}
+
+  // A Bidirectional streaming RPC.
+  //
+  // Accepts a stream of RouteNotes sent while a route is being traversed,
+  // while receiving other RouteNotes (e.g. from other users).
+  //rpc RouteChat(stream RouteNote) returns (stream RouteNote) {}
+}
+
+message SGPConstructRequest{
+  string title = 1;
+  string first = 2;
+  string second = 3;
+}
+enum Status{
+  OK = 0;
+  FAIL = 1;
+};
+message SGPConstructResponse{
+  string computational_id = 1;
+  
+  Status status = 2;
+}
+
+enum CoordType{
+  ECI=0;
+  GEODETIC=1;
+}
+
+message SGPComputeRequest{
+  string computational_id = 1;
+  repeated uint64 encoded_time = 2;
+  
+  CoordType coord_type = 3;
+  bool use_noise = 4;
+  //uint32 number_of_sets = 4;
+}
+
+message CoordGeodetic{
+  double lat = 1;
+  double lon = 2;
+  double alt = 3;
+  uint64 encoded_time=4;
+}
+
+message Vector{
+  double x = 1;
+  double y = 2;
+  double z = 3;
+}
+
+message CoordECI{
+  uint64 encoded_time = 1;
+  Vector position = 2;
+  Vector velocity = 3;
+}
+
+message SGPComputeResponse{
+  CoordType coord_type = 1;
+  repeated CoordGeodetic geodetic = 2;
+  
+  repeated CoordECI eci = 3;
+  Status status = 4;
+  //uint32 number_of_sets = 5;
+}
+

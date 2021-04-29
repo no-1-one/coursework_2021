@@ -1,0 +1,80 @@
+
+
+syntax = "proto3";
+
+option java_multiple_files = true;
+option java_package = "ru.wip.services.sgp";
+option java_outer_classname = "SGPProto";
+option objc_class_prefix = "SGP";
+
+package SGP;
+
+// Interface exported by the server.
+service SGPService {
+
+  rpc SGPConstruct(SGPConstructRequest) returns (SGPConstructResponse) {}
+
+
+  rpc SGPCompute(SGPComputeRequest) returns (SGPComputeResponse) {}
+
+  rpc Close(CloseRequest) returns (CloseResponse) {}
+
+}
+
+message CloseRequest{
+  string computational_id = 2;
+}
+
+message CloseResponse{}
+
+message SGPConstructRequest{
+  string title = 1;
+  string first = 2;
+  string second = 3;
+}
+
+message SGPConstructResponse{
+  string computational_id = 1;
+}
+
+enum CoordType{
+  ECI=0;
+  GEODETIC=1;
+}
+
+message SGPComputeRequest{
+  string computational_id = 1;
+  repeated uint64 encoded_time = 2;
+  
+  CoordType coord_type = 3;
+  bool use_noise = 4;
+  //uint32 number_of_sets = 4;
+}
+
+message CoordGeodetic{
+  double lat = 1;
+  double lon = 2;
+  double alt = 3;
+  uint64 encoded_time=4;
+}
+
+message Vector{
+  double x = 1;
+  double y = 2;
+  double z = 3;
+}
+
+message CoordECI{
+  uint64 encoded_time = 1;
+  Vector position = 2;
+  Vector velocity = 3;
+}
+
+message SGPComputeResponse{
+  CoordType coord_type = 1;
+  repeated CoordGeodetic geodetic = 2;
+  
+  repeated CoordECI eci = 3;
+}
+
+

@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+service AssemblyService {
+
+rpc ReturnArchitecturesAndModules(Empty) returns (ArchitecturesAndModules) {}
+
+rpc CheckingConfiguration(Configuration) returns (Empty) {}
+
+rpc RegisterConfiguration(Configuration) returns (Empty) {}
+
+rpc SearchConfiguration(ConfigurationName) returns(Configuration) {}
+
+}
+
+message ModUnit {
+    string name = 1;
+    int32 size = 2;
+}
+
+message Pair {
+    string key = 1;
+    ModUnit value = 2;
+}
+
+message Configuration {
+    string name = 1;
+    string architecture = 2;
+    repeated Pair included_mod = 3;
+}
+
+message ConfigurationName {
+    string name = 1;
+}
+
+message ArchitecturesAndModules {
+    repeated string all_architectures = 1;
+    repeated ModUnit all_modules = 2;
+}
+
+message Empty {
+
+}

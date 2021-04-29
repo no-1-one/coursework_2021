@@ -1,0 +1,84 @@
+syntax = "proto3";
+import "sgp_service.proto";
+option java_multiple_files = true;
+option java_package = "ru.wip.services.igrf";
+option java_outer_classname = "IGRFProto";
+option objc_class_prefix = "IGRF";
+
+package IGRF;
+
+// Interface exported by the server.
+service IGRFService {
+
+  rpc construct(SGP.SGPConstructRequest) returns (SGP.SGPConstructResponse) {}
+
+  rpc computeForPoint(Point) returns (PointResult) {}
+  
+  rpc computeTLE(TLEComputeRequest) returns (TLEComputeResponse) {} 
+  //function for computing the values of geomagnetic field 
+  //for a certain (TLE, timestamp) pair
+
+  rpc endWork(EndRequest) returns (EndResponse) {}
+}
+
+message EndRequest{
+  string computational_id = 1;
+}
+
+message EndResponse{
+
+}
+
+message Point{
+
+  repeated SGP.CoordGeodetic coord = 1;
+
+  bool add_noise_to_igrf = 4;
+}
+
+message PointResult{
+  repeated igrf_computation_result result = 1;
+  repeated igrf_computation_secular_variance variance = 2;
+  repeated int32 error_code = 3;
+}
+
+message TLEComputeRequest{
+  string computational_id = 1;
+  repeated uint64 encoded_time = 2;
+
+  bool add_noise_to_sgp = 3;
+  bool add_noise_to_igrf = 4;
+}
+
+message TLEComputeResponse{
+  PointResult results = 1;
+}
+
+message igrf_computation_result{
+  double sdate = 1;
+  double declination = 2;
+  double inclination = 3;
+  double horizontal_intensity = 4; //corresponds to "h"
+  double x = 5;
+  double y = 6;
+  double z = 7;
+  double total_intensity = 8;  //corresponds to "f"
+
+  bool has_x = 9;
+  bool has_declination = 10;
+}
+
+message igrf_computation_secular_variance{
+  double sdate = 1;
+  double declination_dot = 2;
+  double inclination_dot = 3;
+  double horizontal_intensity_dot = 4; //corresponds to "hdot"
+  double x_dot = 5;
+  double y_dot = 6;
+  double z_dot = 7;
+  double total_intensity_dot = 8; //corresponds to "fdot"
+
+  bool has_x = 9;
+  bool has_declination = 10;
+}
+
