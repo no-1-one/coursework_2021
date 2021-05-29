@@ -14,7 +14,6 @@ service SGPService {
 
   rpc SGPConstruct(SGPConstructRequest) returns (SGPConstructResponse) {}
 
-
   rpc SGPCompute(SGPComputeRequest) returns (SGPComputeResponse) {}
 
   rpc Close(CloseRequest) returns (CloseResponse) {}
@@ -31,6 +30,7 @@ message SGPConstructRequest{
   string title = 1;
   string first = 2;
   string second = 3;
+  repeated CoordGeodetic observer_locations=4;
 }
 
 message SGPConstructResponse{
@@ -45,7 +45,7 @@ enum CoordType{
 message SGPComputeRequest{
   string computational_id = 1;
   repeated uint64 encoded_time = 2;
-  
+
   CoordType coord_type = 3;
   bool use_noise = 4;
   //uint32 number_of_sets = 4;
@@ -70,11 +70,17 @@ message CoordECI{
   Vector velocity = 3;
 }
 
+message SolarPosition{
+  uint64 encoded_time = 1;
+  Vector vector_to_sun=2;
+  Vector vector_to_sun_from_sat=3;
+  bool is_sun_visible=4;
+}
+
 message SGPComputeResponse{
   CoordType coord_type = 1;
   repeated CoordGeodetic geodetic = 2;
-  
+
   repeated CoordECI eci = 3;
+  repeated SolarPosition solar_position = 4;
 }
-
-

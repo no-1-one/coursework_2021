@@ -24,8 +24,8 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
-
-#include "examples/protos/helloworld.grpc.pb.h"
+#include <string_view>
+//#include "examples/protos/helloworld.grpc.pb.h"
 
 #include "grpc/grpc.h"
 #include "grpcpp/security/server_credentials.h"
@@ -33,39 +33,34 @@
 #include "grpcpp/server_builder.h"
 #include "grpcpp/server_context.h"
 
-#include "assembly_service.grpc.pb.h"
+#include "assembly.grpc.pb.h"
 
 using grpc::Server;
 using grpc::ServerBuilder;
 using grpc::ServerContext;
 using grpc::Status;
+using grpc::StatusCode;
 
-using AssemblyService::ReadArchitecturesAndModules;
-using AssemblyService::ReturnArchitecturesAndModules;
-using AssemblyService::ReadConfiguration;
-using AssemblyService::CheckingConfiguration;
-using AssemblyService::RegistrationСonfiguration;
-using AssemblyService::SearchConfiguration;
+using Assembly::ModUnit;
+using Assembly::Pair;
+using Assembly::Configuration;
+using Assembly::ConfigurationName;
+using Assembly::ArchitecturesAndModules;
+using Assembly::Empty;
 
-using AssemblyService::ModUnit;
-using AssemblyService::Pair;
-using AssemblyService::Configuration;
-using AssemblyService::ConfigurationName;
-using AssemblyService::ArchitecturesAndModules;
-
-using AssemblyService::AssemblyService;
+using Assembly::AssemblyService;
 
 
-struct ModUnit {
+struct ModUnitStruct {
     std::string name;
     int size;
-    bool operator == (const ModUnit& other) const {
+    bool operator == (const ModUnitStruct& other) const {
         return name == other.name;
     }
 };
 
-template<> struct std::hash<ModUnit> {
-    size_t operator()(const ModUnit& modref) const {
+template<> struct std::hash<ModUnitStruct> {
+    size_t operator()(const ModUnitStruct& modref) const {
         return std::hash<std::string>()(modref.name);
     }
 };
@@ -73,20 +68,20 @@ template<> struct std::hash<ModUnit> {
 struct Config {
     std::string name;
     std::string architecture;
-    std::unordered_map<std::string, ModUnit> included_mod;
+    std::unordered_map<std::string, ModUnitStruct> included_mod;
 };
 
 
-class AssemblyServiceServer {
+class AssemblyServiceServer : public AssemblyService::Service{
 public:
     //part 0 in class data
     std::unordered_set<std::string> all_architectures;
-    std::unordered_set<ModUnit> all_modules;
-    std::unordered_set<std::string> config_name;
-    Config inp;
+    std::unordered_set<ModUnitStruct> all_modules;
+    std::unordered_set<std::string> configurations_names;
+    
 
     //part 1 read Architactures and Modules
-    std::string ArchitactureRead () {
+    std::string ArchitectureRead () {
         std::ifstream architectures_file("../../../config/architectures.txt");
         if (!architectures_file.is_open()) {
             return ("Architecture file not found!");
@@ -105,7 +100,7 @@ public:
             return ("Modules file not found");
         }
         std::string inp_val;
-        ModUnit tmp;
+        ModUnitStruct tmp;
         while (modules_file >> inp_val) {
             tmp.size = std::stoi(inp_val);
             (modules_file >> inp_val);
@@ -116,8 +111,8 @@ public:
         return ("OK");
     }
 
-    void ReadServerData () {
-        std::string architectures_read_err = ArchitactureRead();
+    std::string ReadServerData () {
+        std::string architectures_read_err = ArchitectureRead();
         if (architectures_read_err == "OK") {
             architectures_read_err.clear();
         }
@@ -125,51 +120,60 @@ public:
         if (module_read_err == "OK") {
             module_read_err.clear();
         }
-        if ()!(architectures_read_err.empty() && module_read_err.empty())) {
+        if (!(architectures_read_err.empty() && module_read_err.empty())) {
             return (architectures_read_err + module_read_err);
         }
+        return "OK; Read " + std::to_string(all_architectures.size()) + " architectures and " + std::to_string(all_modules.size()) + " modules";
+
     }
 
-
+  
     //part 2 return Architactures and Modules
-    void DatabaseOutput (std::vector<std::string> &architectures_container,
-                         std::vector<ModUnit> &modules_container) {
+    template<class CONT>
+    void DatabaseOutput (CONT* architectures_and_modules_container) {
+        std::cout << all_architectures.size();
         for (auto tmp : all_architectures) {
-            architectures_container.push_back(tmp);
+            architectures_and_modules_container->add_all_architectures(tmp);// container->all_architectures().Add(tmp)
+            std::cout << tmp << std::endl;
         }
         for (auto tmp : all_modules) {
-            modules_container.push_back(tmp);
+            ModUnit mu;
+            mu.set_name(tmp.name);
+            mu.set_size(tmp.size);
+            std::cout << tmp.name << " " << tmp.size << std::endl;
+            *(architectures_and_modules_container->add_all_modules()) = mu;
         }
     }
 
     Status ReturnArchitecturesAndModules(ServerContext* context,
-                                         Empty* empty,
+                                         const Empty* empty,
                                          ArchitecturesAndModules* container) {
-        DatabaseOutput(container->all_architectures, container->all_modules, all_architectures, all_modules);
-        return Status::OK;
+        DatabaseOutput(container);  
+        return grpc::Status::OK;
     }
 
 
     //part 3 Checking Сonfiguration
-    std::string is_configuration_correct () {
-        if (not((inp.architecture == "u1") || (inp.architecture == "u2") || (inp.architecture == "u3"))) {
+    std::string is_configuration_correct (Config& inp) {
+        
+        if (!((inp.architecture == "u1") || (inp.architecture == "u2") || (inp.architecture == "u3"))) {
             return ("There is no such architecture");
         }
         int avaliable_capasity = std::stoi(inp.architecture.substr(1)) * 5;
 
         for (auto& [slot, mod] : inp.included_mod) {
-            if (all_modules.find(mod) != all_modules.end()) {
-                if ((std::stoi(slot) + mod.size) > avaliable_capasity) {
+            if (auto it = all_modules.find(mod); it != all_modules.end()) {
+                auto actual_size = it->size;
+                if ((std::stoi(slot) + actual_size) > avaliable_capasity) {
                     return("There are more units used then available");
                 }
-                /*
-                for (int i = (std::stoi(slot)); i <= std::stoi(slot) + mod.size - 1; ++i) {
+                
+                for (int i = (std::stoi(slot))+1; i < std::stoi(slot) + actual_size; ++i) {
                     if (inp.included_mod.find(std::to_string(i)) != inp.included_mod.end()) {
-                        assert(false && "AAAA!");
-                        return false;
+                        return "Modules overlap";
                     }
                 }
-                */
+                
             } else {
                 return ("There is no such module");
             }
@@ -178,21 +182,25 @@ public:
     }
 
     Status CheckingConfiguration (ServerContext* context,
-                                  Configuration* input,
+                                  const Configuration* input,
                                   Empty* result) {
-        inp.name = input -> name;
-        inp.size = input -> size;
-        for (auto mod : input -> included_mod) {
-            inp.included_mod[mod -> key] = mod -> value;
+        Config inp;
+        inp.name = input->name();
+        inp.architecture = input->architecture();
+        for (auto mod : input->included_mod()) {
+            ModUnitStruct mus;
+            mus.name = mod.value().name();
+            mus.size = mod.value().size();
+            inp.included_mod[mod.key()] = mus;
         }
-        std::string res = is_configuration_correct ();
+        std::string res = is_configuration_correct (inp);
         if (res == "OK") {
-            return Status::OK;
+            return grpc::Status::OK;
         }
-        if (res == "There is no such architecture") {
-            return Status(NOT_FOUND, res);
+        if (res == "There is no such architecture" || res == "There is no such module") {
+            return grpc::Status(StatusCode::NOT_FOUND, res);
         }
-        return Status(INVALID_ARGUMENT, res);
+        return grpc::Status(StatusCode::INVALID_ARGUMENT, res);
     }
 
 
@@ -207,7 +215,7 @@ public:
         while (config_file >> inp_val) {
             if (inp_val[0] == '['){
                 inp_val = inp_val.substr(1, inp_val.size() - 2);
-                if (!(configurations_names.contains(inp_val))) {
+                if (configurations_names.find(inp_val) == configurations_names.end()) {
                     configurations_names.insert(inp_val);
                 }
             }
@@ -217,91 +225,126 @@ public:
     }
 
     Status RegisterConfiguration (ServerContext* context,
-                                  Configuration* input,
+                                  const Configuration* input,
                                   Empty* result) {
-        inp.name = input -> name;
-        inp.size = input -> size;
-        for (auto mod : input -> included_mod) {
-            inp.included_mod[mod -> key] = mod -> value;
+        Config inp;
+        inp.name = input -> name();
+        inp.architecture = input -> architecture();
+        for (auto mod : input -> included_mod()) {
+            ModUnitStruct mus;
+            mus.name = mod.value().name();
+            mus.size = mod.value().size();
+            inp.included_mod[mod.key()] = mus;
         }
-        std::string res = is_configuration_correct ();
+        std::string res = is_configuration_correct (inp);
         if (res == "There is no such architecture") {
-            return Status(NOT_FOUND, res);
+            return grpc::Status(StatusCode::NOT_FOUND, res);
         }
         if (res == "There is no such module") {
-            return Status(NOT_FOUND, res);
+            return grpc::Status(StatusCode::NOT_FOUND, res);
         }
-        if (res == "There are more units used then available") {
-            return Status(INVALID_ARGUMENT, res);
+        if (res == "There are more units used then available" || res == "Modules overlap") {
+            return grpc::Status(StatusCode::INVALID_ARGUMENT, res);
         }
         if (configurations_names.find(inp.name) != configurations_names.end()) {
-            return Status(ALREADY_EXISTS, "Configuration with this name is already exist");
+            return grpc::Status(StatusCode::ALREADY_EXISTS, "Configuration with this name is already exist");
         }
+        configurations_names.insert(inp.name);
         std::ofstream fi_out;
         fi_out.open("../../../config/configurations.txt", std::ios::app);
         fi_out << "\n[" << inp.name << "]" << "\n";
         fi_out << "architecture = " << inp.architecture << "\n";
         for (auto& [slot, mod] : inp.included_mod) {
-            fi_out <<  slot << " = " << mod.name << " " << mod.size << "\n";
+            fi_out <<  slot << " = " << mod.name << " " << all_modules.find(mod)->size << "\n";
         }
         fi_out.close();
-        return Status::OK;
+        
+        return grpc::Status::OK;
     }
 
 
     // part 5 Config Search
-    Config SearchConfiguration(ServerContext* context,
-                               ConfigurationName target,
+    Status SearchConfiguration(ServerContext* context,
+                               const ConfigurationName* target,
                                Configuration* result) {
         std::ifstream configuration_file("../../../config/configurations.txt");
         bool success_search = false;
         if (!configuration_file.is_open()) {
-            return Status(NOT_FOUND, "Configuration file not found");
+            return grpc::Status(StatusCode::NOT_FOUND, "Configuration file not found");
         }
         std::string inp_val;
         while (configuration_file >> inp_val) {
-            if (inp_val[0] == '[' && inp_val.substr(1, inp_val.size() - 2) == target -> name) {
+            /* std::string_view view(inp_val);
+            if (view.at(0) == '[' && view.find(target->name()) != std::string_view::npos) std::cout<<"found"<<std::endl;
+            else std::cout<<"not found"<<std::endl; */
+
+
+            if (inp_val[0] == '[' && inp_val.substr(1, inp_val.size() - 2) == target->name()) {
                 success_search = true;
-                result -> name = target -> name;
+                result -> set_name(target->name());
                 getline(configuration_file, inp_val);
                 getline(configuration_file, inp_val);
-                result -> architecture = inp_val.substr(inp_val.find("=") + 2);
+                result -> set_architecture(inp_val.substr(inp_val.find("=") + 2));
 
                 std::string key, mod_str;
                 ModUnit mod;
                 while (getline(configuration_file, inp_val)) {
                     if (inp_val.empty()) {
                         configuration_file.close();
-                        return Status::OK;
+                        return grpc::Status::OK;
                     }
                     key = inp_val.substr(0, inp_val.find("=") - 1);
                     mod_str = inp_val.substr(inp_val.find("=") + 2);
-                    mod.name = mod_str.substr(0, mod_str.find(" "));
-                    mod.size = std::stoi(mod_str.substr(mod_str.find(" ") + 1));
-                    result -> included_mod.push_bask(std::pair<key, mod>);
+
+                    mod.set_name(mod_str.substr(0, mod_str.find(" ")));
+                    mod.set_size(std::stoi(mod_str.substr(mod_str.find(" ") + 1)));
+                    Pair p;
+                    p.set_key(key);
+                    *(p.mutable_value()) = mod;
+                    *(result -> add_included_mod()) = p;
                 }
             }
         }
-        return Status(NOT_FOUND, "Configuration with this name does not exist");
+        return grpc::Status(StatusCode::NOT_FOUND, "Configuration with this name does not exist");
     }
 };
 
 
-void RunServer(std::string port) {
+void RunServer(std::string port, bool test = false) {
   std::string server_address("0.0.0.0:"+port);
 
-  AssemblyService service{};
+  AssemblyServiceServer service{};
+  std::cout << service.ReadServerData() << std::endl;
+  std::cout << service.ConfigNames() << std::endl;
+  for (auto config : service.configurations_names) std::cout << config << std::endl;
   ServerBuilder builder;
   builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
   builder.RegisterService(&service);
   std::unique_ptr<Server> server(builder.BuildAndStart());
   std::cout << "Server listening on " << server_address << std::endl;
-  server->Wait();
+  if (test) {
+    bool keep_going = true;
+    std::string s;
+    while (keep_going) {
+      std::cin >> s;
+      if (s == "STOP") keep_going = false;
+      pthread_yield();
+    }
+    server->Shutdown();
+  } else {
+    server->Wait();
+  }
 }
 
 int main(int argc, char** argv) {
-
-  RunServer(argv[1]);
+  if (argc < 2) {
+  std::cout << "Usage: ./assembly_server N [OPTIONS]\n N - port number\n"
+            << "OPTIONS include --test, which implies using a pipe";
+  return 1;
+  }
+  RunServer(argv[1], argc == 3 && strcmp(argv[2], "--test") == 0
+                      ? true
+                      : false);
 
   return 0;
 }

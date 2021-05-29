@@ -117,6 +117,7 @@ class IGRFServiceImpl : public IGRFService::Service {
       igrf_compute(&IGRFrequest, &IGRFcomputation);
       igrf_computation_result computation_result = IGRFcomputation.result;
       igrf_computation_secular_variance variance = IGRFcomputation.variance;
+      std::cout << computation_result.y << "\n";
       if (dot->add_noise_to_igrf()) {
         GaussianNoise<PseudoNoiseMixin> noise(0, 50);
         if (IGRFcomputation.result.has_x) {

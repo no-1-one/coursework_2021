@@ -1,5 +1,7 @@
 syntax = "proto3";
 
+package Assembly;
+
 service AssemblyService {
 
 rpc ReturnArchitecturesAndModules(Empty) returns (ArchitecturesAndModules) {}

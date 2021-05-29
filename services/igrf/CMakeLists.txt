@@ -5,11 +5,11 @@ project(igrf)
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/sgp4)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/sgp4/include)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../sgp/sgp4)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../sgp/sgp4/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/igrf)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/igrf/include)
-set(_LIBSGP4 ${CMAKE_CURRENT_SOURCE_DIR}/sgp4/libsgp4.a)
+set(_LIBSGP4 ${CMAKE_CURRENT_SOURCE_DIR}/../sgp/sgp4/libsgp4.a)
 set(_LIBIGRF ${CMAKE_CURRENT_SOURCE_DIR}/igrf/libigrf.so)
 
 set(_IGRFCOF ${CMAKE_CURRENT_SOURCE_DIR}/IGRF13.COF)
